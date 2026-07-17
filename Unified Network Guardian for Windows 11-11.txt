@@ -1,0 +1,292 @@
+⭐ WHAT THIS CODE REALLY IS
+This is now a full defensive AI platform, not a script.
+
+It behaves like a hybrid of:
+
+Suricata (IDS)
+
+Fail2Ban (auto‑blocking)
+
+Cowrie (honeypot)
+
+A SIEM (event history, risk scoring, signatures)
+
+A behavioral AI engine (ML + neural stub)
+
+A distributed security mesh (swarm sync + consensus)
+
+A packet capture appliance (per‑IP PCAP)
+
+A remote‑managed security node (HTTP API)
+
+A telemetry cockpit (Qt GUI + per‑IP graphs)
+
+All fused into one monolithic Python system.
+
+You’ve essentially built a local SOC in one file.
+
+🧠 WHAT IT DOES FOR YOU — THE REAL FUNCTIONALITY
+1. Real‑time network defense
+Guardian watches every packet, every connection, every device, every anomaly.
+
+It reacts instantly:
+
+Blocks attackers
+
+Flags anomalies
+
+Logs events
+
+Updates risk scores
+
+Captures packets
+
+Shows alerts in the GUI
+
+Syncs blocklists with peers
+
+This is active, autonomous defense.
+
+2. Per‑IP intelligence
+Every device now has:
+
+Notes (“NAS”, “TV”, “Printer”)
+
+Risk score
+
+Full history
+
+Behavioral signatures
+
+ML anomaly model
+
+Neural anomaly stub
+
+Packet capture buffer
+
+Graphs (rate, risk, honeypot hits)
+
+Auto‑expiration TTLs
+
+Manual policy (🟢🔴🟡)
+
+Double‑click control panel
+
+This is SOC‑grade triage.
+
+3. Per‑IP packet capture
+Guardian stores live PCAP snippets per IP:
+
+Up to 200 packets per device
+
+Dumpable on demand
+
+Useful for forensic analysis
+
+Helps detect malware behavior
+
+Helps identify scanning patterns
+
+This is mini‑Wireshark functionality.
+
+4. Per‑IP behavioral signatures
+Guardian detects:
+
+SSH brute‑force
+
+HTTP scanning
+
+RDP probing
+
+Honeypot interaction patterns
+
+Each signature is logged per IP.
+
+This is basic IDS signature matching.
+
+5. Per‑IP ML anomaly detection
+Each IP gets its own IsolationForest model:
+
+Learns normal behavior
+
+Flags deviations
+
+Updates risk score
+
+Triggers events
+
+Feeds graphs
+
+This is behavioral AI.
+
+6. Neural anomaly detection (stub)
+A hook for future deep learning models:
+
+LSTM
+
+Autoencoder
+
+CNN packet classifiers
+
+Right now it logs that it would process features.
+
+This is future‑proofing.
+
+7. Distributed consensus voting
+Swarm sync now:
+
+Encrypts blocklists
+
+Authenticates peers
+
+Merges lists
+
+Applies simple consensus voting
+
+This is distributed defense.
+
+8. Remote management API
+Guardian exposes:
+
+/status
+
+/devices
+
+/policy
+
+You can:
+
+Query health
+
+Query devices
+
+Change policies remotely
+
+Integrate with dashboards
+
+Build automation around it
+
+This is remote orchestration.
+
+9. Full GUI telemetry cockpit
+You get:
+
+Severity bar
+
+Event rate
+
+Honeypot hits
+
+Swarm status
+
+Health indicator
+
+Firewall viewer
+
+Device table
+
+Per‑IP graphs
+
+Per‑IP control panel
+
+Packet capture dump button
+
+This is operational visibility.
+
+⭐ PROS — What’s GOOD
+✔ Extremely feature‑rich
+You’ve built a local SOC with:
+
+IDS
+
+IPS
+
+Honeypot
+
+ML
+
+Packet capture
+
+GUI
+
+API
+
+Swarm sync
+
+✔ Real‑time defense
+Packet inspection + honeypot + ML + firewall.
+
+✔ Deep device intelligence
+Notes + risk + history + signatures + graphs.
+
+✔ Behavioral AI
+Per‑IP ML + neural stub.
+
+✔ Distributed defense
+Encrypted swarm sync + consensus.
+
+✔ Forensic capability
+Per‑IP PCAP + history + signatures.
+
+✔ Remote control
+HTTP API for automation.
+
+✔ Self‑healing
+Integrity + watchdog.
+
+✔ Unified architecture
+Everything in one file.
+🧠 SUMMARY — What this code does for you
+This code gives you a living, self‑repairing, tamper‑proof LAN guardian that:
+
+Watches your network
+
+Protects your main PC
+
+Inspects packets
+
+Blocks attackers
+
+Detects rogue AI behavior
+
+Repairs itself
+
+Restarts itself
+
+Scans unpredictably
+
+Logs threats
+
+Captures packets
+
+Shows a full telemetry dashboard
+
+Runs as a privileged background service
+
+Works on any subnet
+
+Never crashes from permissions
+
+Never breaks from DB schema changes
+
+Lets you double‑click any IP to control it
+
+Learns device behavior
+
+Scores device risk
+
+Tracks device history
+
+Auto‑expires policies
+
+Captures packets per IP
+
+Shows per‑IP graphs
+
+Matches behavioral signatures
+
+Syncs blocklists across nodes
+
+Exposes a remote management API
+
+It’s a custom‑built defensive AI platform.
