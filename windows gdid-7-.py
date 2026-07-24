@@ -1,0 +1,1826 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+Codex Purge Shell – Unified Python File v9 (Qt Freeze-Proof Edition)
+Fake Telemetry + Persona Engine + IdentityCRL Shadow Layer + Self-Healing + Threat-Adaptive + Reputation
+
+GUI: PyQt5 – install with:
+    pip install PyQt5
+
+All behavior is simulated and safe (no destructive OS changes).
+"""
+
+import json
+import time
+import threading
+import random
+import queue
+from dataclasses import dataclass, field
+from typing import Optional, Dict, Any, List
+
+# ============================================================
+# Qt Imports
+# ============================================================
+
+try:
+    from PyQt5 import QtWidgets, QtCore, QtGui
+except ImportError:
+    QtWidgets = None
+    QtCore = None
+    QtGui = None
+
+
+# ============================================================
+# Core Utilities
+# ============================================================
+
+class SafeLogger:
+    def __init__(self):
+        self._lock = threading.Lock()
+        self._entries: List[str] = []
+        self.low_noise_mode: bool = False
+        self.max_entries: int = 500  # smaller for GUI stability
+
+    def log(self, msg: str, force: bool = False):
+        if self.low_noise_mode and not force:
+            return
+        ts = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime())
+        line = f"[{ts}] {msg}"
+        with self._lock:
+            self._entries.append(line)
+            if len(self._entries) > self.max_entries:
+                self._entries = self._entries[-self.max_entries:]
+        print(line)
+
+    def get_recent(self, limit: int = 60) -> List[str]:
+        with self._lock:
+            return self._entries[-limit:]
+
+    def set_low_noise(self, enabled: bool):
+        self.low_noise_mode = enabled
+        self.log(f"[Logger] Low-noise mode set to {enabled}", force=True)
+
+
+class JsonStateStore:
+    def __init__(self, path: str, logger: SafeLogger):
+        self.path = path
+        self.logger = logger
+        self.state: Dict[str, Any] = {}
+        self._lock = threading.Lock()
+        self.load()
+
+    def load(self):
+        try:
+            with open(self.path, "r", encoding="utf-8") as f:
+                self.state = json.load(f)
+            self.logger.log(f"State loaded from {self.path}")
+        except FileNotFoundError:
+            self.logger.log(f"No existing state file at {self.path}, starting fresh.")
+            self.state = {}
+        except Exception as e:
+            self.logger.log(f"Error loading state: {e}")
+            self.state = {}
+
+    def save(self):
+        with self._lock:
+            try:
+                with open(self.path, "w", encoding="utf-8") as f:
+                    json.dump(self.state, f, indent=2)
+                self.logger.log(f"State saved to {self.path}")
+            except Exception as e:
+                self.logger.log(f"Error saving state: {e}")
+
+    def get(self, key: str, default=None):
+        with self._lock:
+            return self.state.get(key, default)
+
+    def set(self, key: str, value: Any):
+        with self._lock:
+            self.state[key] = value
+        self.save()
+
+
+# ============================================================
+# Boot Metadata / Integrity Check
+# ============================================================
+
+@dataclass
+class BootInfo:
+    first_boot: bool
+    last_boot_ts: float
+    current_boot_ts: float
+    reboot_interval_sec: float
+
+
+def compute_boot_info(state_store: JsonStateStore, logger: SafeLogger) -> BootInfo:
+    current_ts = time.time()
+    last_boot_ts = state_store.get("last_boot_ts", 0.0)
+    first_boot_done = bool(state_store.get("first_boot_done", False))
+
+    first_boot = not first_boot_done
+    reboot_interval = current_ts - last_boot_ts if last_boot_ts > 0 else 0.0
+
+    if first_boot:
+        logger.log("[IntegrityCheck] First boot detected. Validating state structure.")
+        for key in [
+            "persona",
+            "identity_shadow",
+            "ml_patterns",
+            "quarantine",
+            "threat_scores",
+            "persona_memory",
+            "reputation",
+        ]:
+            if key not in state_store.state:
+                logger.log(f"[IntegrityCheck] Missing key '{key}' in state (expected on first boot).")
+        state_store.set("first_boot_done", True)
+    else:
+        logger.log(f"[IntegrityCheck] Subsequent boot detected. Reboot interval ~{int(reboot_interval)}s.")
+
+    state_store.set("last_boot_ts", current_ts)
+
+    return BootInfo(
+        first_boot=first_boot,
+        last_boot_ts=last_boot_ts,
+        current_boot_ts=current_ts,
+        reboot_interval_sec=reboot_interval,
+    )
+
+
+# ============================================================
+# Persona Forge v3 (Adaptive Evolution + Memory)
+# ============================================================
+
+@dataclass
+class PersonaMemoryEntry:
+    ts: float
+    event_type: str
+    details: Dict[str, Any]
+
+
+@dataclass
+class FakePersona:
+    id: str
+    device_fingerprint: str
+    activity_profile: str
+    sync_state: str
+    risk_level: str
+    metadata: Dict[str, Any] = field(default_factory=dict)
+    memory: List[PersonaMemoryEntry] = field(default_factory=list)
+
+
+class PersonaForge:
+    def __init__(self):
+        self.regions = ["US", "EU", "APAC", "LATAM", "MEA"]
+        self.roles = ["workstation", "lab-node", "honeypot", "gaming-rig", "dev-box", "test-bench"]
+        self.activity_profiles = ["idle", "light", "moderate", "heavy", "burst"]
+        self.sync_states = ["in-sync", "lagging", "desynced", "partial-sync"]
+        self.risk_levels = ["low", "medium", "high"]
+        self.app_stacks = [
+            ["Edge", "Office", "Teams"],
+            ["Chrome", "VSCode", "Git"],
+            ["Steam", "Discord", "Browser"],
+            ["SecuritySuite", "AdminTools", "PowerShell"],
+        ]
+        self.network_styles = ["home", "lab", "corp", "vpn", "mixed"]
+
+    def forge_persona(self) -> FakePersona:
+        pid = f"persona-{random.randint(10**8, 10**9-1)}"
+        fingerprint = f"FP-{random.randint(10**12, 10**13-1)}"
+        activity = random.choice(self.activity_profiles)
+        sync_state = random.choice(self.sync_states)
+        risk = random.choice(self.risk_levels)
+        region = random.choice(self.regions)
+        role = random.choice(self.roles)
+        apps = random.choice(self.app_stacks)
+        net_style = random.choice(self.network_styles)
+        metadata = {
+            "os_profile": random.choice(["Windows-Shadow", "Windows-Edge", "Windows-Null"]),
+            "region": region,
+            "role": role,
+            "timezone": random.choice(["UTC-5", "UTC+1", "UTC+8"]),
+            "usage_pattern": random.choice(["office-hours", "night-owl", "mixed"]),
+            "apps": apps,
+            "network_style": net_style,
+            "lineage_tag": f"lineage-{random.randint(1000,9999)}",
+            "evolution_stage": 0,
+        }
+        return FakePersona(
+            id=pid,
+            device_fingerprint=fingerprint,
+            activity_profile=activity,
+            sync_state=sync_state,
+            risk_level=risk,
+            metadata=metadata,
+            memory=[],
+        )
+
+    def evolve_persona(self, persona: FakePersona) -> FakePersona:
+        stage = persona.metadata.get("evolution_stage", 0) + 1
+        persona.metadata["evolution_stage"] = stage
+
+        if stage % 2 == 0:
+            persona.metadata["region"] = random.choice(self.regions)
+        if stage % 3 == 0:
+            persona.metadata["apps"] = random.choice(self.app_stacks)
+        if stage % 4 == 0:
+            persona.sync_state = random.choice(self.sync_states)
+        if stage % 5 == 0:
+            persona.device_fingerprint = f"FP-{random.randint(10**12, 10**13-1)}"
+
+        return persona
+
+
+# ============================================================
+# Persona Engine v3 (Swarm + Evolution + Memory Persistence)
+# ============================================================
+
+class PersonaEngine:
+    def __init__(self, state_store: JsonStateStore, logger: SafeLogger, forge: PersonaForge):
+        self.state_store = state_store
+        self.logger = logger
+        self.forge = forge
+        self._lock = threading.Lock()
+
+        self.current_persona: Optional[FakePersona] = None
+        self.persona_locked: bool = False
+
+        self.swarm_enabled: bool = False
+        self.swarm_personas: List[FakePersona] = []
+        self.swarm_index: int = 0
+        self.swarm_target_size: int = 6
+
+        self.last_rotation_ts: float = time.time()
+        self.rotation_interval_sec: float = 900  # 15 minutes
+
+        self._load_or_create_persona()
+        self._load_lock_state()
+        self._load_swarm_state()
+        self._load_persona_memory()
+
+        self._rotation_thread = threading.Thread(target=self._rotation_loop, daemon=True)
+        self._rotation_thread.start()
+
+    def _load_or_create_persona(self):
+        data = self.state_store.get("persona", None)
+        if data:
+            try:
+                mem_data = self.state_store.get("persona_memory", [])
+                memory = [
+                    PersonaMemoryEntry(
+                        ts=entry.get("ts", 0.0),
+                        event_type=entry.get("event_type", ""),
+                        details=entry.get("details", {}),
+                    )
+                    for entry in mem_data
+                ]
+                data["memory"] = memory
+                self.current_persona = FakePersona(**data)
+                self.logger.log("Loaded existing fake persona with memory from state.")
+            except Exception as e:
+                self.logger.log(f"Error loading persona with memory: {e}")
+                self.current_persona = self.forge.forge_persona()
+                self._persist_persona()
+        else:
+            self.current_persona = self.forge.forge_persona()
+            self._persist_persona()
+            self.logger.log("Generated new fake persona via Persona Forge v3.")
+
+    def _load_lock_state(self):
+        locked = self.state_store.get("persona_locked", False)
+        self.persona_locked = bool(locked)
+        self.logger.log(f"Persona lock state loaded: locked={self.persona_locked}")
+
+    def _load_swarm_state(self):
+        swarm_data = self.state_store.get("persona_swarm", None)
+        self.swarm_enabled = bool(self.state_store.get("swarm_enabled", False))
+        if swarm_data:
+            try:
+                self.swarm_personas = []
+                for p in swarm_data:
+                    mem_data = p.get("memory", [])
+                    memory = [
+                        PersonaMemoryEntry(
+                            ts=entry.get("ts", 0.0),
+                            event_type=entry.get("event_type", ""),
+                            details=entry.get("details", {}),
+                        )
+                        for entry in mem_data
+                    ]
+                    p["memory"] = memory
+                    self.swarm_personas.append(FakePersona(**p))
+                self.logger.log(f"Loaded Persona Swarm with {len(self.swarm_personas)} personas.")
+            except Exception as e:
+                self.logger.log(f"Error loading Persona Swarm: {e}")
+                self.swarm_personas = []
+        else:
+            self.swarm_personas = []
+
+    def _load_persona_memory(self):
+        mem_data = self.state_store.get("persona_memory", [])
+        if self.current_persona:
+            try:
+                memory = [
+                    PersonaMemoryEntry(
+                        ts=entry.get("ts", 0.0),
+                        event_type=entry.get("event_type", ""),
+                        details=entry.get("details", {}),
+                    )
+                    for entry in mem_data
+                ]
+                self.current_persona.memory = memory
+                self.logger.log(f"Loaded persona memory with {len(memory)} entries.")
+            except Exception as e:
+                self.logger.log(f"Error loading persona memory: {e}")
+
+    def _persist_persona(self):
+        if self.current_persona:
+            data = self.current_persona.__dict__.copy()
+            mem_data = [
+                {"ts": m.ts, "event_type": m.event_type, "details": m.details}
+                for m in self.current_persona.memory
+            ]
+            data["memory"] = mem_data
+            self.state_store.set("persona", data)
+            self.state_store.set("persona_memory", mem_data)
+
+    def _persist_lock_state(self):
+        self.state_store.set("persona_locked", self.persona_locked)
+
+    def _persist_swarm_state(self):
+        swarm_data = []
+        for p in self.swarm_personas:
+            d = p.__dict__.copy()
+            d["memory"] = [
+                {"ts": m.ts, "event_type": m.event_type, "details": m.details}
+                for m in p.memory
+            ]
+            swarm_data.append(d)
+        self.state_store.set("persona_swarm", swarm_data)
+        self.state_store.set("swarm_enabled", self.swarm_enabled)
+
+    def rotate_persona(self, reason: str = "manual"):
+        with self._lock:
+            if self.persona_locked:
+                self.logger.log(f"Persona rotation requested ({reason}) but Persona Lock is ACTIVE. Rotation skipped.")
+                return
+            self.current_persona = self.forge.forge_persona()
+            self._persist_persona()
+            self.last_rotation_ts = time.time()
+            self.logger.log(f"Persona rotated via Persona Forge v3 (reason={reason}).")
+
+    def evolve_current_persona(self, reason: str = "adaptive"):
+        with self._lock:
+            if not self.current_persona:
+                return
+            self.current_persona = self.forge.evolve_persona(self.current_persona)
+            self._persist_persona()
+            self.logger.log(f"Persona evolved (reason={reason}) stage={self.current_persona.metadata.get('evolution_stage')}.")
+
+    def _rotation_loop(self):
+        while True:
+            time.sleep(5)
+            with self._lock:
+                if self.persona_locked:
+                    continue
+                now = time.time()
+                if now - self.last_rotation_ts >= self.rotation_interval_sec:
+                    self.rotate_persona(reason="scheduled")
+                else:
+                    if random.random() < 0.03:
+                        self.evolve_current_persona(reason="background")
+
+    def get_persona(self, subsystem: str = "") -> FakePersona:
+        with self._lock:
+            if self.swarm_enabled and self.swarm_personas:
+                self.swarm_index = (self.swarm_index + 1) % len(self.swarm_personas)
+                persona = self.swarm_personas[self.swarm_index]
+                self.logger.log(
+                    f"Persona Swarm selected persona [{persona.id}] for subsystem [{subsystem}]."
+                )
+                return persona
+            return self.current_persona
+
+    def add_memory_event(self, persona: FakePersona, event_type: str, details: Dict[str, Any]):
+        entry = PersonaMemoryEntry(ts=time.time(), event_type=event_type, details=details)
+        persona.memory.append(entry)
+        if len(persona.memory) > 50:
+            persona.memory = persona.memory[-50:]
+        if persona is self.current_persona:
+            self._persist_persona()
+
+    def toggle_lock(self):
+        with self._lock:
+            self.persona_locked = not self.persona_locked
+            self._persist_lock_state()
+            state = "ACTIVE" if self.persona_locked else "INACTIVE"
+            self.logger.log(f"Persona Lock toggled: {state}")
+
+    def get_lock_state(self) -> bool:
+        with self._lock:
+            return self.persona_locked
+
+    def toggle_swarm(self):
+        with self._lock:
+            self.swarm_enabled = not self.swarm_enabled
+            if self.swarm_enabled and len(self.swarm_personas) < self.swarm_target_size:
+                needed = self.swarm_target_size - len(self.swarm_personas)
+                for _ in range(needed):
+                    self.swarm_personas.append(self.forge.forge_persona())
+                self.logger.log(
+                    f"Persona Swarm initialized/expanded to {len(self.swarm_personas)} forged personas."
+                )
+            self._persist_swarm_state()
+            state = "ACTIVE" if self.swarm_enabled else "INACTIVE"
+            self.logger.log(f"Persona Swarm toggled: {state}")
+
+    def get_swarm_state(self) -> bool:
+        with self._lock:
+            return self.swarm_enabled
+
+    def get_swarm_summary(self) -> List[Dict[str, Any]]:
+        with self._lock:
+            data = []
+            for p in self.swarm_personas[:4]:
+                d = {
+                    "id": p.id,
+                    "region": p.metadata.get("region"),
+                    "role": p.metadata.get("role"),
+                    "risk": p.risk_level,
+                    "stage": p.metadata.get("evolution_stage"),
+                }
+                data.append(d)
+            return data
+
+    def apply_boot_policies(self, boot_info: BootInfo):
+        with self._lock:
+            if boot_info.first_boot:
+                self.logger.log("[BootPolicy] First boot: Persona kept as-is (lineage established).")
+            else:
+                if self.swarm_enabled and self.swarm_personas:
+                    resurrect_index = random.randint(0, len(self.swarm_personas) - 1)
+                    resurrected = self.swarm_personas[resurrect_index]
+                    self.logger.log(
+                        f"[BootPolicy] Cold-Boot Persona Resurrection v3: resurrecting [{resurrected.id}] "
+                        f"with lineage [{resurrected.metadata.get('lineage_tag','?')}]."
+                    )
+                    self.current_persona = resurrected
+                    self._persist_persona()
+                else:
+                    if not self.persona_locked:
+                        self.logger.log("[BootPolicy] Reboot detected: rotating persona safely via forge v3.")
+                        self.current_persona = self.forge.forge_persona()
+                        self._persist_persona()
+                    else:
+                        self.logger.log("[BootPolicy] Reboot detected but Persona Lock ACTIVE; rotation skipped.")
+
+
+# ============================================================
+# IdentityCRL Shadow Layer v3 (Stealth-L4 Cloaking)
+# ============================================================
+
+@dataclass
+class IdentityShadowState:
+    real_lid_hex: Optional[str] = None
+    real_lid_numeric: Optional[int] = None
+    fake_lid_numeric: Optional[int] = None
+    active: bool = False
+    last_rotation_ts: float = 0.0
+    kill_switch: bool = False
+    auto_kill: bool = False
+    stealth_mode: bool = False
+    stealth_tier: int = 0
+    reboot_lockdown_until: float = 0.0
+    identity_null_decay_ts: float = 0.0
+
+
+class IdentityShadowLayer:
+    def __init__(self, state_store: JsonStateStore, logger: SafeLogger):
+        self.state_store = state_store
+        self.logger = logger
+        self.state = IdentityShadowState()
+        self._lock = threading.Lock()
+        self._load_state()
+
+    def _load_state(self):
+        data = self.state_store.get("identity_shadow", None)
+        if data:
+            self.state = IdentityShadowState(**data)
+            self.logger.log("Loaded Identity Shadow state from JSON.")
+        else:
+            self.logger.log("No Identity Shadow state found; initializing fresh.")
+            self._init_state()
+            self._persist_state()
+
+    def _init_state(self):
+        self.state.real_lid_hex = f"{random.getrandbits(64):016x}"
+        self.state.real_lid_numeric = int(self.state.real_lid_hex, 16)
+        self.state.fake_lid_numeric = self._generate_fake_lid()
+        self.state.active = False
+        self.state.kill_switch = False
+        self.state.auto_kill = True
+        self.state.stealth_mode = False
+        self.state.stealth_tier = 0
+        self.state.reboot_lockdown_until = 0.0
+        self.state.last_rotation_ts = time.time()
+        self.state.identity_null_decay_ts = 0.0
+        self.logger.log(
+            f"Initialized Identity Shadow v3: real_hex={self.state.real_lid_hex}, "
+            f"real_numeric={self.state.real_lid_numeric}, fake={self.state.fake_lid_numeric}"
+        )
+
+    def _persist_state(self):
+        self.state_store.set("identity_shadow", self.state.__dict__)
+
+    def _generate_fake_lid(self) -> int:
+        fake = random.getrandbits(64)
+        self.logger.log(f"Generated fake LID: {fake}")
+        return fake
+
+    def activate(self):
+        with self._lock:
+            if not self.state.active:
+                self.state.active = True
+                self.logger.log("Identity Shadow Layer ACTIVATED.")
+                self._persist_state()
+
+    def deactivate(self):
+        with self._lock:
+            if self.state.active:
+                self.state.active = False
+                self.logger.log("Identity Shadow Layer DEACTIVATED.")
+                self._persist_state()
+
+    def toggle_kill_switch(self):
+        with self._lock:
+            self.state.kill_switch = not self.state.kill_switch
+            state = "ACTIVE" if self.state.kill_switch else "INACTIVE"
+            self.logger.log(f"Kill Switch toggled: {state}")
+            self._persist_state()
+
+    def toggle_auto_kill(self):
+        with self._lock:
+            self.state.auto_kill = not self.state.auto_kill
+            state = "ACTIVE" if self.state.auto_kill else "INACTIVE"
+            self.logger.log(f"Auto-Kill mode toggled: {state}")
+            self._persist_state()
+
+    def toggle_stealth_mode(self):
+        with self._lock:
+            self.state.stealth_mode = not self.state.stealth_mode
+            if self.state.stealth_mode and self.state.stealth_tier == 0:
+                self.state.stealth_tier = 1
+            if not self.state.stealth_mode:
+                self.state.stealth_tier = 0
+            state = "ACTIVE" if self.state.stealth_mode else "INACTIVE"
+            self.logger.log(f"Stealth Mode toggled: {state} (tier={self.state.stealth_tier})")
+            self._persist_state()
+
+    def set_stealth_tier(self, tier: int):
+        with self._lock:
+            tier = max(0, min(4, tier))
+            self.state.stealth_tier = tier
+            self.state.stealth_mode = tier > 0
+            self.logger.log(f"Stealth tier set to {tier} (mode={self.state.stealth_mode})")
+            self._persist_state()
+
+    def rotate_fake_lid(self):
+        with self._lock:
+            self.state.fake_lid_numeric = self._generate_fake_lid()
+            self.state.last_rotation_ts = time.time()
+            self.logger.log("Fake LID rotated.")
+            self._persist_state()
+
+    def apply_boot_policies(self, boot_info: BootInfo):
+        with self._lock:
+            if boot_info.first_boot:
+                self.state.stealth_mode = True
+                self.state.stealth_tier = 1
+                self.logger.log("[BootPolicy] First boot: Stealth Mode AUTO-ENABLED (tier=1).")
+            else:
+                lockdown_duration = 300
+                self.state.reboot_lockdown_until = boot_info.current_boot_ts + lockdown_duration
+                self.logger.log(
+                    f"[BootPolicy] Reboot detected: Lockdown timer set for {lockdown_duration}s."
+                )
+            self._persist_state()
+
+    def _lockdown_active(self) -> bool:
+        return time.time() < self.state.reboot_lockdown_until
+
+    def _identity_null_active(self) -> bool:
+        return self.state.stealth_mode and self.state.stealth_tier >= 2
+
+    def _identity_cloak_active(self) -> bool:
+        return self.state.stealth_mode and self.state.stealth_tier == 4
+
+    def get_effective_lid(self, subsystem: str) -> int:
+        with self._lock:
+            if self._identity_cloak_active():
+                self.logger.log(
+                    f"[Stealth-L4] Subsystem {subsystem} requested identity. Identity-void cloak returned."
+                )
+                return 0
+
+            if self._identity_null_active():
+                self.logger.log(
+                    f"[Stealth-L{self.state.stealth_tier}] Subsystem {subsystem} requested identity. Identity-null returned."
+                )
+                return 0
+
+            if self.state.kill_switch or self._lockdown_active():
+                if self.state.fake_lid_numeric is None:
+                    self.state.fake_lid_numeric = self._generate_fake_lid()
+                    self._persist_state()
+                if self._lockdown_active():
+                    self.logger.log(
+                        f"[Lockdown] Subsystem {subsystem} requested identity during reboot lockdown. Fake LID enforced."
+                    )
+                else:
+                    self.logger.log(
+                        f"[KillSwitch] Subsystem {subsystem} requested identity. Fake LID enforced."
+                    )
+                return self.state.fake_lid_numeric
+
+            if self.state.active and self.state.fake_lid_numeric is not None:
+                return self.state.fake_lid_numeric
+
+            self._log_leak(subsystem)
+            if self.state.auto_kill:
+                self.state.kill_switch = True
+                self.logger.log(
+                    f"[AutoKill] Leak detected for subsystem [{subsystem}]. Kill Switch ACTIVATED (aggressive)."
+                )
+                self._persist_state()
+                return self.state.fake_lid_numeric or self._generate_fake_lid()
+
+            return self.state.real_lid_numeric or 0
+
+    def _log_leak(self, subsystem: str):
+        self.logger.log(
+            f"[LeakDetector] Potential real LID usage by subsystem [{subsystem}] "
+            f"(Shadow OFF, KillSwitch OFF, Stealth tier={self.state.stealth_tier}, Lockdown OFF)."
+        )
+
+    def get_state_snapshot(self) -> Dict[str, Any]:
+        with self._lock:
+            return {
+                "real_lid_hex": self.state.real_lid_hex,
+                "real_lid_numeric": self.state.real_lid_numeric,
+                "fake_lid_numeric": self.state.fake_lid_numeric,
+                "active": self.state.active,
+                "kill_switch": self.state.kill_switch,
+                "auto_kill": self.state.auto_kill,
+                "stealth_mode": self.state.stealth_mode,
+                "stealth_tier": self.state.stealth_tier,
+                "reboot_lockdown_until": self.state.reboot_lockdown_until,
+                "last_rotation_ts": self.state.last_rotation_ts,
+                "identity_null_decay_ts": self.state.identity_null_decay_ts,
+            }
+
+
+# ============================================================
+# Deep Pattern Detector + Reputation Engine
+# ============================================================
+
+@dataclass
+class SubsystemStats:
+    name: str
+    access_count: int = 0
+    last_access_ts: float = 0.0
+    leak_count: int = 0
+    flood_count: int = 0
+    burst_count: int = 0
+    last_burst_ts: float = 0.0
+
+
+class PatternDetector:
+    def __init__(self, state_store: JsonStateStore, logger: SafeLogger):
+        self.state_store = state_store
+        self.logger = logger
+        self._lock = threading.Lock()
+        self.subsystems: Dict[str, SubsystemStats] = {}
+        self._load_state()
+
+    def _load_state(self):
+        data = self.state_store.get("ml_patterns", {})
+        try:
+            for name, stats in data.items():
+                self.subsystems[name] = SubsystemStats(
+                    name=name,
+                    access_count=stats.get("access_count", 0),
+                    last_access_ts=stats.get("last_access_ts", 0.0),
+                    leak_count=stats.get("leak_count", 0),
+                    flood_count=stats.get("flood_count", 0),
+                    burst_count=stats.get("burst_count", 0),
+                    last_burst_ts=stats.get("last_burst_ts", 0.0),
+                )
+            self.logger.log(f"[ML] Loaded pattern detector state for {len(self.subsystems)} subsystems.")
+        except Exception as e:
+            self.logger.log(f"[ML] Error loading pattern state: {e}")
+            self.subsystems = {}
+
+    def _persist_state(self):
+        data = {
+            name: {
+                "access_count": stats.access_count,
+                "last_access_ts": stats.last_access_ts,
+                "leak_count": stats.leak_count,
+                "flood_count": stats.flood_count,
+                "burst_count": stats.burst_count,
+                "last_burst_ts": stats.last_burst_ts,
+            }
+            for name, stats in self.subsystems.items()
+        }
+        self.state_store.set("ml_patterns", data)
+
+    def record_access(self, subsystem: str):
+        now = time.time()
+        with self._lock:
+            stats = self.subsystems.get(subsystem)
+            if not stats:
+                stats = SubsystemStats(name=subsystem)
+                self.subsystems[subsystem] = stats
+            stats.access_count += 1
+            if now - stats.last_access_ts < 2.0:
+                stats.burst_count += 1
+                stats.last_burst_ts = now
+            stats.last_access_ts = now
+            self._persist_state()
+
+    def record_leak(self, subsystem: str):
+        with self._lock:
+            stats = self.subsystems.get(subsystem)
+            if not stats:
+                stats = SubsystemStats(name=subsystem)
+                self.subsystems[subsystem] = stats
+            stats.leak_count += 1
+            self._persist_state()
+
+    def record_flood(self, subsystem: str):
+        with self._lock:
+            stats = self.subsystems.get(subsystem)
+            if not stats:
+                stats = SubsystemStats(name=subsystem)
+                self.subsystems[subsystem] = stats
+            stats.flood_count += 1
+            self._persist_state()
+
+    def compute_threat_score(self, subsystem: str) -> float:
+        with self._lock:
+            stats = self.subsystems.get(subsystem)
+            if not stats:
+                return 0.0
+            score = 0.0
+            score += stats.access_count * 0.5
+            score += stats.leak_count * 5.0
+            score += stats.flood_count * 0.2
+            score += stats.burst_count * 1.0
+            if "Sync" in subsystem or "Cloud" in subsystem:
+                score += 10.0
+            return score
+
+    def get_snapshot(self) -> Dict[str, Any]:
+        with self._lock:
+            # summary only – freeze-proof
+            summary = {}
+            for name, stats in self.subsystems.items():
+                summary[name] = {
+                    "access_count": stats.access_count,
+                    "leak_count": stats.leak_count,
+                    "burst_count": stats.burst_count,
+                    "threat_score": self.compute_threat_score(name),
+                }
+            return summary
+
+
+class ThreatScoreStore:
+    def __init__(self, state_store: JsonStateStore, logger: SafeLogger):
+        self.state_store = state_store
+        self.logger = logger
+        self._lock = threading.Lock()
+        self.scores: Dict[str, float] = {}
+        self._load()
+
+    def _load(self):
+        data = self.state_store.get("threat_scores", {})
+        self.scores = {k: float(v) for k, v in data.items()}
+
+    def _persist(self):
+        self.state_store.set("threat_scores", self.scores)
+
+    def set_score(self, subsystem: str, score: float):
+        with self._lock:
+            self.scores[subsystem] = score
+            self._persist()
+
+    def get_snapshot(self) -> Dict[str, float]:
+        with self._lock:
+            # top 5 only – freeze-proof
+            items = sorted(self.scores.items(), key=lambda x: x[1], reverse=True)[:5]
+            return dict(items)
+
+
+@dataclass
+class SubsystemReputation:
+    trust: float = 0.0
+    risk: float = 0.0
+    leak: float = 0.0
+    behavior: float = 0.0
+
+
+class ReputationEngine:
+    def __init__(self, state_store: JsonStateStore, logger: SafeLogger):
+        self.state_store = state_store
+        self.logger = logger
+        self._lock = threading.Lock()
+        self.reputation: Dict[str, SubsystemReputation] = {}
+        self._load()
+
+    def _load(self):
+        data = self.state_store.get("reputation", {})
+        try:
+            for name, rep in data.items():
+                self.reputation[name] = SubsystemReputation(
+                    trust=rep.get("trust", 0.0),
+                    risk=rep.get("risk", 0.0),
+                    leak=rep.get("leak", 0.0),
+                    behavior=rep.get("behavior", 0.0),
+                )
+            self.logger.log(f"[Reputation] Loaded reputation for {len(self.reputation)} subsystems.")
+        except Exception as e:
+            self.logger.log(f"[Reputation] Error loading reputation: {e}")
+            self.reputation = {}
+
+    def _persist(self):
+        data = {
+            name: {
+                "trust": rep.trust,
+                "risk": rep.risk,
+                "leak": rep.leak,
+                "behavior": rep.behavior,
+            }
+            for name, rep in self.reputation.items()
+        }
+        self.state_store.set("reputation", data)
+
+    def update_reputation(self, subsystem: str, threat_score: float, stats: SubsystemStats):
+        with self._lock:
+            rep = self.reputation.get(subsystem, SubsystemReputation())
+            rep.risk = threat_score
+            rep.leak = stats.leak_count * 5.0
+            rep.behavior = stats.burst_count * 1.0 + stats.access_count * 0.2
+            rep.trust = max(0.0, 100.0 - rep.risk - rep.leak - rep.behavior)
+            self.reputation[subsystem] = rep
+            self._persist()
+
+    def get_reputation(self, subsystem: str) -> SubsystemReputation:
+        with self._lock:
+            return self.reputation.get(subsystem, SubsystemReputation())
+
+    def get_snapshot(self) -> Dict[str, Any]:
+        with self._lock:
+            # top 5 only – freeze-proof
+            items = sorted(self.reputation.items(), key=lambda x: x[1].risk, reverse=True)[:5]
+            return {
+                name: {
+                    "trust": rep.trust,
+                    "risk": rep.risk,
+                    "leak": rep.leak,
+                    "behavior": rep.behavior,
+                }
+                for name, rep in items
+            }
+
+
+# ============================================================
+# Subsystem Quarantine v3
+# ============================================================
+
+class SubsystemQuarantine:
+    def __init__(self, state_store: JsonStateStore, logger: SafeLogger):
+        self.state_store = state_store
+        self.logger = logger
+        self._lock = threading.Lock()
+        self.quarantined: Dict[str, float] = {}
+        self._load_state()
+
+    def _load_state(self):
+        data = self.state_store.get("quarantine", {})
+        try:
+            self.quarantined = {name: float(ts) for name, ts in data.items()}
+            self.logger.log(f"[Quarantine] Loaded {len(self.quarantined)} quarantined subsystems.")
+        except Exception as e:
+            self.logger.log(f"[Quarantine] Error loading quarantine state: {e}")
+            self.quarantined = {}
+
+    def _persist_state(self):
+        self.state_store.set("quarantine", self.quarantined)
+
+    def quarantine(self, subsystem: str):
+        with self._lock:
+            self.quarantined[subsystem] = time.time()
+            self.logger.log(f"[Quarantine] Subsystem [{subsystem}] quarantined (strict fake-only identity).")
+            self._persist_state()
+
+    def is_quarantined(self, subsystem: str) -> bool:
+        with self._lock:
+            return subsystem in self.quarantined
+
+    def get_snapshot(self) -> Dict[str, Any]:
+        with self._lock:
+            # top 5 only – freeze-proof
+            items = list(self.quarantined.items())[-5:]
+            return dict(items)
+
+
+# ============================================================
+# Telemetry Mirage v3 (Reality Layer)
+# ============================================================
+
+class TelemetryMirage:
+    def __init__(self, logger: SafeLogger):
+        self.logger = logger
+
+    def generate_mirage_session(self, subsystem: str, persona: FakePersona):
+        events = []
+        base_ts = time.time()
+        for i in range(3):  # lighter than v8
+            event_type = random.choice(
+                ["browsing", "app_launch", "sync_failure", "health_change", "idle"]
+            )
+            payload = {
+                "subsystem": subsystem,
+                "persona_id": persona.id,
+                "fingerprint": persona.device_fingerprint,
+                "region": persona.metadata.get("region", "Unknown"),
+                "event_type": event_type,
+                "ts": base_ts + i * random.uniform(1.0, 8.0),
+                "apps": persona.metadata.get("apps", []),
+                "network_style": persona.metadata.get("network_style", "Unknown"),
+                "usage_pattern": persona.metadata.get("usage_pattern", "Unknown"),
+            }
+            events.append(payload)
+            self.logger.log(
+                f"[MirageReality] Synthetic {event_type} event for [{subsystem}] persona [{persona.id}]."
+            )
+        return events
+
+
+# ============================================================
+# Honeypot Sandbox
+# ============================================================
+
+class HoneypotSandbox:
+    def __init__(self, logger: SafeLogger):
+        self.logger = logger
+        self._events: List[Dict[str, Any]] = []
+        self._lock = threading.Lock()
+
+    def record_event(self, event: Dict[str, Any]):
+        with self._lock:
+            self._events.append(event)
+            if len(self._events) > 200:
+                self._events = self._events[-200:]
+        self.logger.log(f"Honeypot recorded event: {event.get('type', 'unknown')}")
+
+    def get_events(self, limit: int = 50) -> List[Dict[str, Any]]:
+        with self._lock:
+            return self._events[-limit:]
+
+
+# ============================================================
+# Threat-Adaptive Controller v3
+# ============================================================
+
+class ThreatAdaptiveController:
+    def __init__(
+        self,
+        logger: SafeLogger,
+        identity_shadow: IdentityShadowLayer,
+        persona_engine: PersonaEngine,
+        telemetry_engine: "FakeTelemetryEngine",
+        pattern_detector: PatternDetector,
+        quarantine: SubsystemQuarantine,
+        threat_scores: ThreatScoreStore,
+        reputation_engine: ReputationEngine,
+    ):
+        self.logger = logger
+        self.identity_shadow = identity_shadow
+        self.persona_engine = persona_engine
+        self.telemetry_engine = telemetry_engine
+        self.pattern_detector = pattern_detector
+        self.quarantine = quarantine
+        self.threat_scores = threat_scores
+        self.reputation_engine = reputation_engine
+        self._lock = threading.Lock()
+
+        self.telemetry_counter: int = 0
+        self.identity_access_counter: int = 0
+
+    def record_identity_access(self, subsystem: str):
+        with self._lock:
+            self.identity_access_counter += 1
+        self.pattern_detector.record_access(subsystem)
+        self._evaluate(subsystem)
+
+    def record_leak(self, subsystem: str):
+        self.pattern_detector.record_leak(subsystem)
+        self._evaluate(subsystem)
+
+    def record_telemetry(self, subsystem: str):
+        with self._lock:
+            self.telemetry_counter += 1
+        self._evaluate(subsystem)
+
+    def _evaluate(self, subsystem: str):
+        snapshot = self.pattern_detector.get_snapshot()
+        stats_data = snapshot.get(subsystem, {})
+        stats = SubsystemStats(
+            name=subsystem,
+            access_count=stats_data.get("access_count", 0),
+            last_access_ts=0.0,
+            leak_count=stats_data.get("leak_count", 0),
+            flood_count=0,
+            burst_count=stats_data.get("burst_count", 0),
+            last_burst_ts=0.0,
+        )
+
+        score = self.pattern_detector.compute_threat_score(subsystem)
+        self.threat_scores.set_score(subsystem, score)
+        self.reputation_engine.update_reputation(subsystem, score, stats)
+        rep = self.reputation_engine.get_reputation(subsystem)
+
+        if score >= 25.0 and not self.quarantine.is_quarantined(subsystem):
+            self.quarantine.quarantine(subsystem)
+
+        if self.telemetry_counter >= 30:
+            self.logger.log("[ThreatAdaptive] Telemetry spike detected -> auto-stealth tier 2.")
+            self.identity_shadow.set_stealth_tier(2)
+            self.telemetry_counter = 0
+
+        if score >= 40.0:
+            if not self.persona_engine.get_swarm_state():
+                self.logger.log("[ThreatAdaptive] High threat score -> auto-swarm.")
+                self.persona_engine.toggle_swarm()
+
+        if "Sync" in subsystem or "Cloud" in subsystem:
+            self.logger.log("[ThreatAdaptive] Sync-like subsystem detected -> auto-kill.")
+            self.identity_shadow.toggle_kill_switch()
+
+        if score >= 60.0 or rep.risk >= 60.0:
+            self.logger.log("[ThreatAdaptive] Very high threat score -> Stealth tier 3 + Flooder.")
+            self.identity_shadow.set_stealth_tier(3)
+            if not self.telemetry_engine.flooder_enabled:
+                self.telemetry_engine.toggle_flooder()
+
+        if rep.risk >= 80.0:
+            self.logger.log("[ThreatAdaptive] Extreme risk -> Stealth-L4 cloak.")
+            self.identity_shadow.set_stealth_tier(4)
+
+
+# ============================================================
+# Fake Telemetry Engine v3 (Flooder v2 + Glyphs + Mirage v3 + Persona Memory)
+# ============================================================
+
+class FakeTelemetryEngine:
+    def __init__(
+        self,
+        persona_engine: PersonaEngine,
+        identity_shadow: IdentityShadowLayer,
+        logger: SafeLogger,
+        pattern_detector: PatternDetector,
+        quarantine: SubsystemQuarantine,
+        mirage: TelemetryMirage,
+        honeypot: HoneypotSandbox,
+    ):
+        self.persona_engine = persona_engine
+        self.identity_shadow = identity_shadow
+        self.logger = logger
+        self.pattern_detector = pattern_detector
+        self.quarantine = quarantine
+        self.mirage = mirage
+        self.honeypot = honeypot
+        self._lock = threading.Lock()
+        self._event_queue: "queue.Queue[Dict[str, Any]]" = queue.Queue()
+        self._running = False
+        self._thread: Optional[threading.Thread] = None
+
+        self.flooder_enabled: bool = False
+        self.threat_controller: Optional[ThreatAdaptiveController] = None
+
+    def attach_threat_controller(self, controller: ThreatAdaptiveController):
+        self.threat_controller = controller
+
+    def start(self):
+        with self._lock:
+            if not self._running:
+                self._running = True
+                self._thread = threading.Thread(target=self._loop, daemon=True)
+                self._thread.start()
+                self.logger.log("Fake Telemetry Engine v3 started.")
+
+    def stop(self):
+        with self._lock:
+            self._running = False
+        self.logger.log("Fake Telemetry Engine v3 stopped.")
+
+    def _loop(self):
+        while True:
+            with self._lock:
+                if not self._running:
+                    break
+            try:
+                event = self._event_queue.get(timeout=0.5)
+                self._process_event(event)
+            except queue.Empty:
+                pass
+
+    def submit_identity_access(self, subsystem: str):
+        persona = self.persona_engine.get_persona(subsystem)
+        effective_lid = self.identity_shadow.get_effective_lid(subsystem)
+        snapshot = self.identity_shadow.get_state_snapshot()
+
+        if self.threat_controller:
+            self.threat_controller.record_identity_access(subsystem)
+
+        self.pattern_detector.record_access(subsystem)
+
+        event = {
+            "type": "identity_access",
+            "subsystem": subsystem,
+            "persona": {
+                "id": persona.id,
+                "device_fingerprint": persona.device_fingerprint,
+                "activity_profile": persona.activity_profile,
+                "sync_state": persona.sync_state,
+                "risk_level": persona.risk_level,
+                "metadata": persona.metadata,
+            },
+            "effective_lid": effective_lid,
+            "shadow_active": snapshot["active"],
+            "kill_switch": snapshot["kill_switch"],
+            "auto_kill": snapshot["auto_kill"],
+            "stealth_mode": snapshot["stealth_mode"],
+            "stealth_tier": snapshot["stealth_tier"],
+            "lockdown_until": snapshot["reboot_lockdown_until"],
+            "ts": time.time(),
+        }
+        self._event_queue.put(event)
+
+    def toggle_flooder(self):
+        with self._lock:
+            self.flooder_enabled = not self.flooder_enabled
+            state = "ACTIVE" if self.flooder_enabled else "INACTIVE"
+            self.logger.log(f"Identity Flooder v2 toggled: {state}")
+
+    def _process_event(self, event: Dict[str, Any]):
+        if event["type"] == "identity_access":
+            self._handle_identity_access(event)
+
+    def _handle_identity_access(self, event: Dict[str, Any]):
+        persona_data = event["persona"]
+        persona = FakePersona(
+            id=persona_data["id"],
+            device_fingerprint=persona_data["device_fingerprint"],
+            activity_profile=persona_data["activity_profile"],
+            sync_state=persona_data["sync_state"],
+            risk_level=persona_data["risk_level"],
+            metadata=persona_data["metadata"],
+            memory=[],
+        )
+
+        lid = event["effective_lid"]
+        shadow_active = event["shadow_active"]
+        kill_switch = event["kill_switch"]
+        auto_kill = event["auto_kill"]
+        stealth_mode = event["stealth_mode"]
+        stealth_tier = event["stealth_tier"]
+        subsystem = event["subsystem"]
+
+        glyph = self._glyph_for_state(shadow_active, kill_switch, stealth_mode, stealth_tier)
+        mode_tags = []
+        if kill_switch:
+            mode_tags.append("KillSwitch")
+        if shadow_active:
+            mode_tags.append("Shadow")
+        if auto_kill:
+            mode_tags.append("AutoKill")
+        if stealth_mode:
+            mode_tags.append(f"Stealth-L{stealth_tier}")
+        if self.flooder_enabled:
+            mode_tags.append("Flooder")
+        if self.persona_engine.get_swarm_state():
+            mode_tags.append("Swarm")
+        if self.quarantine.is_quarantined(subsystem):
+            mode_tags.append("Quarantined")
+
+        tag_str = ",".join(mode_tags) if mode_tags else "Normal"
+
+        msg = (
+            f"{glyph} Identity access by [{subsystem}] -> "
+            f"LID={lid} modes=[{tag_str}] "
+            f"persona={persona.id} fp={persona.device_fingerprint} "
+            f"activity={persona.activity_profile} sync={persona.sync_state} "
+            f"risk={persona.risk_level}"
+        )
+        self.logger.log(msg)
+
+        events = self.mirage.generate_mirage_session(subsystem, persona)
+        for e in events:
+            self.persona_engine.add_memory_event(
+                persona,
+                event_type=e["event_type"],
+                details={"subsystem": subsystem, "ts": e["ts"]},
+            )
+
+        honeypot_event = {
+            "type": "identity_access",
+            "subsystem": subsystem,
+            "persona_id": persona.id,
+            "ts": time.time(),
+        }
+        self.honeypot.record_event(honeypot_event)
+
+        if self.flooder_enabled:
+            self._identity_flood(subsystem)
+
+    def _glyph_for_state(self, shadow_active: bool, kill_switch: bool, stealth_mode: bool, stealth_tier: int) -> str:
+        if stealth_mode:
+            if stealth_tier == 4:
+                return "⬛"
+            if stealth_tier == 3:
+                return "▣"
+            if stealth_tier == 2:
+                return "□"
+            return "◻"
+        if kill_switch:
+            return "■"
+        if shadow_active:
+            return "●"
+        return "▲"
+
+    def _identity_flood(self, subsystem: str):
+        burst_size = random.randint(2, 4)
+        for i in range(burst_size):
+            persona = self.persona_engine.get_persona(f"{subsystem}-Flood-{i}")
+            fake_lid = random.getrandbits(64)
+            glyph = "◆"
+            msg = (
+                f"{glyph} Flood v2 event [{i}/{burst_size}] for subsystem [{subsystem}] -> "
+                f"LID={fake_lid} persona={persona.id} fp={persona.device_fingerprint} "
+                f"activity={persona.activity_profile} sync={persona.sync_state} "
+                f"risk={persona.risk_level}"
+            )
+            self.logger.log(msg)
+            self.pattern_detector.record_flood(subsystem)
+            if self.threat_controller:
+                self.threat_controller.record_telemetry(subsystem)
+
+
+# ============================================================
+# Self-Healing Engine v1
+# ============================================================
+
+class SelfHealingEngine:
+    def __init__(
+        self,
+        logger: SafeLogger,
+        state_store: JsonStateStore,
+        identity_shadow: IdentityShadowLayer,
+        persona_engine: PersonaEngine,
+        pattern_detector: PatternDetector,
+        quarantine: SubsystemQuarantine,
+        threat_scores: ThreatScoreStore,
+        reputation_engine: ReputationEngine,
+    ):
+        self.logger = logger
+        self.state_store = state_store
+        self.identity_shadow = identity_shadow
+        self.persona_engine = persona_engine
+        self.pattern_detector = pattern_detector
+        self.quarantine = quarantine
+        self.threat_scores = threat_scores
+        self.reputation_engine = reputation_engine
+        self._lock = threading.Lock()
+        self._thread = threading.Thread(target=self._loop, daemon=True)
+        self._running = True
+        self._thread.start()
+
+    def _loop(self):
+        while self._running:
+            time.sleep(12)
+            self._check_and_heal()
+
+    def stop(self):
+        self._running = False
+
+    def _check_and_heal(self):
+        with self._lock:
+            shadow_data = self.state_store.get("identity_shadow", None)
+            if not shadow_data:
+                self.logger.log("[SelfHealing] Missing identity_shadow state. Reinitializing.")
+                self.identity_shadow._init_state()
+                self.identity_shadow._persist_state()
+
+            persona_data = self.state_store.get("persona", None)
+            if not persona_data:
+                self.logger.log("[SelfHealing] Missing persona state. Regenerating.")
+                self.persona_engine.rotate_persona(reason="self-heal")
+
+            swarm_data = self.state_store.get("persona_swarm", None)
+            if self.persona_engine.get_swarm_state() and not swarm_data:
+                self.logger.log("[SelfHealing] Swarm enabled but no swarm state. Rebuilding swarm.")
+                self.persona_engine.toggle_swarm()
+
+            patterns_data = self.state_store.get("ml_patterns", None)
+            if patterns_data is None:
+                self.logger.log("[SelfHealing] Missing pattern state. Resetting.")
+                self.state_store.set("ml_patterns", {})
+
+            quarantine_data = self.state_store.get("quarantine", None)
+            if quarantine_data is None:
+                self.logger.log("[SelfHealing] Missing quarantine state. Resetting.")
+                self.state_store.set("quarantine", {})
+
+            threat_data = self.state_store.get("threat_scores", None)
+            if threat_data is None:
+                self.logger.log("[SelfHealing] Missing threat_scores state. Resetting.")
+                self.state_store.set("threat_scores", {})
+
+            reputation_data = self.state_store.get("reputation", None)
+            if reputation_data is None:
+                self.logger.log("[SelfHealing] Missing reputation state. Resetting.")
+                self.state_store.set("reputation", {})
+
+
+# ============================================================
+# Qt GUI – Freeze-Proof Edition
+# ============================================================
+
+class CodexQtGUI(QtWidgets.QMainWindow):
+    def __init__(
+        self,
+        logger: SafeLogger,
+        identity_shadow: IdentityShadowLayer,
+        persona_engine: PersonaEngine,
+        telemetry_engine: FakeTelemetryEngine,
+        pattern_detector: PatternDetector,
+        quarantine: SubsystemQuarantine,
+        threat_scores: ThreatScoreStore,
+        reputation_engine: ReputationEngine,
+    ):
+        super().__init__()
+        self.logger = logger
+        self.identity_shadow = identity_shadow
+        self.persona_engine = persona_engine
+        self.telemetry_engine = telemetry_engine
+        self.pattern_detector = pattern_detector
+        self.quarantine = quarantine
+        self.threat_scores = threat_scores
+        self.reputation_engine = reputation_engine
+
+        self.setWindowTitle("Codex Purge Shell – Identity Shadow Layer v9 (Qt Freeze-Proof)")
+        self.resize(1300, 800)
+
+        self.lite_mode: bool = True  # default: freeze-proof mode
+
+        self._build_ui()
+
+        self.refresh_timer = QtCore.QTimer(self)
+        self.refresh_timer.timeout.connect(self._refresh_ui)
+        self.refresh_timer.start(5000)  # 5s refresh – stable
+
+    def _build_ui(self):
+        central = QtWidgets.QWidget()
+        self.setCentralWidget(central)
+
+        layout = QtWidgets.QVBoxLayout(central)
+
+        # Shadow Panel
+        shadow_group = QtWidgets.QGroupBox("Identity Shadow Layer v9")
+        layout.addWidget(shadow_group)
+        s_layout = QtWidgets.QGridLayout(shadow_group)
+
+        self.shadow_status_label = QtWidgets.QLabel("Shadow Status: Unknown")
+        s_layout.addWidget(self.shadow_status_label, 0, 0)
+
+        self.shadow_toggle_btn = QtWidgets.QPushButton("Toggle Shadow ON/OFF")
+        self.shadow_toggle_btn.clicked.connect(self._toggle_shadow)
+        s_layout.addWidget(self.shadow_toggle_btn, 0, 1)
+
+        self.kill_switch_label = QtWidgets.QLabel("Kill Switch: Unknown")
+        s_layout.addWidget(self.kill_switch_label, 1, 0)
+
+        self.kill_switch_btn = QtWidgets.QPushButton("Toggle Kill Switch")
+        self.kill_switch_btn.clicked.connect(self._toggle_kill_switch)
+        s_layout.addWidget(self.kill_switch_btn, 1, 1)
+
+        self.auto_kill_label = QtWidgets.QLabel("Auto-Kill: Unknown")
+        s_layout.addWidget(self.auto_kill_label, 2, 0)
+
+        self.auto_kill_btn = QtWidgets.QPushButton("Toggle Auto-Kill")
+        self.auto_kill_btn.clicked.connect(self._toggle_auto_kill)
+        s_layout.addWidget(self.auto_kill_btn, 2, 1)
+
+        self.stealth_label = QtWidgets.QLabel("Stealth Mode: Unknown")
+        s_layout.addWidget(self.stealth_label, 3, 0)
+
+        self.stealth_btn = QtWidgets.QPushButton("Toggle Stealth Mode")
+        self.stealth_btn.clicked.connect(self._toggle_stealth)
+        s_layout.addWidget(self.stealth_btn, 3, 1)
+
+        self.stealth_tier_label = QtWidgets.QLabel("Stealth Tier: Unknown")
+        s_layout.addWidget(self.stealth_tier_label, 4, 0)
+
+        tier_buttons_layout = QtWidgets.QHBoxLayout()
+        for tier, label in [(1, "Tier 1"), (2, "Tier 2"), (3, "Tier 3"), (4, "Tier 4 (Cloak)")]:
+            btn = QtWidgets.QPushButton(label)
+            btn.clicked.connect(lambda _, t=tier: self._set_stealth_tier(t))
+            tier_buttons_layout.addWidget(btn)
+        s_layout.addLayout(tier_buttons_layout, 4, 1)
+
+        self.rotate_lid_btn = QtWidgets.QPushButton("Rotate Fake LID Now")
+        self.rotate_lid_btn.clicked.connect(self._rotate_fake_lid)
+        s_layout.addWidget(self.rotate_lid_btn, 0, 2)
+
+        self.shadow_summary = QtWidgets.QPlainTextEdit()
+        self.shadow_summary.setReadOnly(True)
+        self.shadow_summary.setMaximumHeight(120)
+        s_layout.addWidget(self.shadow_summary, 5, 0, 1, 3)
+
+        # Persona Panel
+        persona_group = QtWidgets.QGroupBox("Fake Persona Metadata v3 (Summary)")
+        layout.addWidget(persona_group)
+        p_layout = QtWidgets.QGridLayout(persona_group)
+
+        self.persona_summary = QtWidgets.QPlainTextEdit()
+        self.persona_summary.setReadOnly(True)
+        self.persona_summary.setMaximumHeight(140)
+        p_layout.addWidget(self.persona_summary, 0, 0, 1, 3)
+
+        self.rotate_persona_btn = QtWidgets.QPushButton("Rotate Persona")
+        self.rotate_persona_btn.clicked.connect(self._rotate_persona)
+        p_layout.addWidget(self.rotate_persona_btn, 1, 0)
+
+        self.persona_lock_label = QtWidgets.QLabel("Persona Lock: Unknown")
+        p_layout.addWidget(self.persona_lock_label, 1, 1)
+
+        self.persona_lock_btn = QtWidgets.QPushButton("Toggle Persona Lock")
+        self.persona_lock_btn.clicked.connect(self._toggle_persona_lock)
+        p_layout.addWidget(self.persona_lock_btn, 1, 2)
+
+        self.swarm_label = QtWidgets.QLabel("Persona Swarm: Unknown")
+        p_layout.addWidget(self.swarm_label, 2, 0)
+
+        self.swarm_btn = QtWidgets.QPushButton("Toggle Persona Swarm")
+        self.swarm_btn.clicked.connect(self._toggle_swarm)
+        p_layout.addWidget(self.swarm_btn, 2, 1)
+
+        self.swarm_summary = QtWidgets.QPlainTextEdit()
+        self.swarm_summary.setReadOnly(True)
+        self.swarm_summary.setMaximumHeight(100)
+        p_layout.addWidget(self.swarm_summary, 3, 0, 1, 3)
+
+        # Telemetry Panel
+        telemetry_group = QtWidgets.QGroupBox("Identity Access Log (Glyph-coded v3, Lite)")
+        layout.addWidget(telemetry_group)
+        t_layout = QtWidgets.QVBoxLayout(telemetry_group)
+
+        self.telemetry_log = QtWidgets.QPlainTextEdit()
+        self.telemetry_log.setReadOnly(True)
+        t_layout.addWidget(self.telemetry_log)
+
+        btn_row = QtWidgets.QHBoxLayout()
+        self.sim_access_edge = QtWidgets.QPushButton("Simulate Identity Access (Edge Sync)")
+        self.sim_access_edge.clicked.connect(lambda: self._simulate_identity_access("EdgeSync"))
+        btn_row.addWidget(self.sim_access_edge)
+
+        self.sim_access_store = QtWidgets.QPushButton("Simulate Identity Access (Store)")
+        self.sim_access_store.clicked.connect(lambda: self._simulate_identity_access("MicrosoftStore"))
+        btn_row.addWidget(self.sim_access_store)
+
+        self.sim_access_telemetry = QtWidgets.QPushButton("Simulate Identity Access (Telemetry)")
+        self.sim_access_telemetry.clicked.connect(lambda: self._simulate_identity_access("Telemetry"))
+        btn_row.addWidget(self.sim_access_telemetry)
+
+        self.refresh_log_btn = QtWidgets.QPushButton("Refresh Log")
+        self.refresh_log_btn.clicked.connect(self._refresh_log)
+        btn_row.addWidget(self.refresh_log_btn)
+
+        t_layout.addLayout(btn_row)
+
+        status_row = QtWidgets.QHBoxLayout()
+        self.flooder_label = QtWidgets.QLabel("Identity Flooder v2: Unknown")
+        status_row.addWidget(self.flooder_label)
+
+        self.flooder_btn = QtWidgets.QPushButton("Toggle Flooder v2")
+        self.flooder_btn.clicked.connect(self._toggle_flooder)
+        status_row.addWidget(self.flooder_btn)
+
+        self.logger_mode_label = QtWidgets.QLabel("Logger Mode: Normal")
+        status_row.addWidget(self.logger_mode_label)
+
+        self.logger_mode_btn = QtWidgets.QPushButton("Toggle Low-Noise")
+        self.logger_mode_btn.clicked.connect(self._toggle_logger_mode)
+        status_row.addWidget(self.logger_mode_btn)
+
+        self.lite_mode_label = QtWidgets.QLabel("GUI Mode: Lite (Freeze-Proof)")
+        status_row.addWidget(self.lite_mode_label)
+
+        self.lite_mode_btn = QtWidgets.QPushButton("Toggle Lite/Heavy GUI")
+        self.lite_mode_btn.clicked.connect(self._toggle_lite_mode)
+        status_row.addWidget(self.lite_mode_btn)
+
+        t_layout.addLayout(status_row)
+
+        # Patterns / Quarantine / Threat / Reputation Panel
+        meta_group = QtWidgets.QGroupBox("Patterns, Quarantine, Threat Scores, Reputation (Summaries)")
+        layout.addWidget(meta_group)
+        m_layout = QtWidgets.QGridLayout(meta_group)
+
+        self.pattern_view = QtWidgets.QPlainTextEdit()
+        self.pattern_view.setReadOnly(True)
+        self.pattern_view.setMaximumHeight(100)
+        m_layout.addWidget(self.pattern_view, 0, 0, 1, 2)
+
+        self.quarantine_view = QtWidgets.QPlainTextEdit()
+        self.quarantine_view.setReadOnly(True)
+        self.quarantine_view.setMaximumHeight(70)
+        m_layout.addWidget(self.quarantine_view, 1, 0, 1, 2)
+
+        self.threat_view = QtWidgets.QPlainTextEdit()
+        self.threat_view.setReadOnly(True)
+        self.threat_view.setMaximumHeight(70)
+        m_layout.addWidget(self.threat_view, 2, 0, 1, 2)
+
+        self.reputation_view = QtWidgets.QPlainTextEdit()
+        self.reputation_view.setReadOnly(True)
+        self.reputation_view.setMaximumHeight(70)
+        m_layout.addWidget(self.reputation_view, 3, 0, 1, 2)
+
+        # Glyph Legend
+        legend_group = QtWidgets.QGroupBox("Glyph Legend v3")
+        layout.addWidget(legend_group)
+        l_layout = QtWidgets.QVBoxLayout(legend_group)
+
+        legend_text = (
+            "■ Kill Switch / Lockdown ACTIVE – hard block, real identity never leaves.\n"
+            "● Shadow ACTIVE – fake identity used, real identity shadowed.\n"
+            "▲ Shadow OFF & Kill Switch OFF – potential leak, Leak Detector watching.\n"
+            "◻ Stealth-L1 – light stealth, fake identity bias.\n"
+            "□ Stealth-L2 – strong stealth, identity-null bias.\n"
+            "▣ Stealth-L3 – maximum stealth, identity-null enforced.\n"
+            "⬛ Stealth-L4 – identity-void cloak, machine appears identity-null.\n"
+            "◆ Flood v2 – Identity Flooder generating burst fake identity noise."
+        )
+        self.legend_label = QtWidgets.QLabel(legend_text)
+        self.legend_label.setAlignment(QtCore.Qt.AlignLeft | QtCore.Qt.AlignTop)
+        l_layout.addWidget(self.legend_label)
+
+    # --- Callbacks ---
+
+    def _toggle_shadow(self):
+        snapshot = self.identity_shadow.get_state_snapshot()
+        if snapshot["active"]:
+            self.identity_shadow.deactivate()
+        else:
+            self.identity_shadow.activate()
+        self._refresh_ui()
+
+    def _toggle_kill_switch(self):
+        self.identity_shadow.toggle_kill_switch()
+        self._refresh_ui()
+
+    def _toggle_auto_kill(self):
+        self.identity_shadow.toggle_auto_kill()
+        self._refresh_ui()
+
+    def _toggle_stealth(self):
+        self.identity_shadow.toggle_stealth_mode()
+        self._refresh_ui()
+
+    def _set_stealth_tier(self, tier: int):
+        self.identity_shadow.set_stealth_tier(tier)
+        self._refresh_ui()
+
+    def _rotate_fake_lid(self):
+        self.identity_shadow.rotate_fake_lid()
+        self._refresh_ui()
+
+    def _rotate_persona(self):
+        self.persona_engine.rotate_persona(reason="manual")
+        self._refresh_ui()
+
+    def _toggle_persona_lock(self):
+        self.persona_engine.toggle_lock()
+        self._refresh_ui()
+
+    def _toggle_swarm(self):
+        self.persona_engine.toggle_swarm()
+        self._refresh_ui()
+
+    def _toggle_flooder(self):
+        self.telemetry_engine.toggle_flooder()
+        self._refresh_ui()
+
+    def _toggle_logger_mode(self):
+        new_mode = not logger.low_noise_mode
+        logger.set_low_noise(new_mode)
+        self._refresh_ui()
+
+    def _toggle_lite_mode(self):
+        self.lite_mode = not self.lite_mode
+        mode = "Lite (Freeze-Proof)" if self.lite_mode else "Heavy (Verbose)"
+        self.lite_mode_label.setText(f"GUI Mode: {mode}")
+        self._refresh_ui()
+
+    def _simulate_identity_access(self, subsystem: str):
+        self.telemetry_engine.submit_identity_access(subsystem)
+
+    # --- Refresh ---
+
+    def _refresh_ui(self):
+        snapshot = self.identity_shadow.get_state_snapshot()
+        status = "ACTIVE" if snapshot["active"] else "INACTIVE"
+        kill_state = "ACTIVE" if snapshot["kill_switch"] else "INACTIVE"
+        auto_kill_state = "ACTIVE" if snapshot["auto_kill"] else "INACTIVE"
+        stealth_state = "ACTIVE" if snapshot["stealth_mode"] else "INACTIVE"
+        stealth_tier = snapshot["stealth_tier"]
+
+        glyph = "●" if snapshot["active"] else "▲"
+        if snapshot["kill_switch"] or time.time() < snapshot["reboot_lockdown_until"]:
+            glyph = "■"
+        if snapshot["stealth_mode"]:
+            if stealth_tier == 4:
+                glyph = "⬛"
+            elif stealth_tier == 3:
+                glyph = "▣"
+            elif stealth_tier == 2:
+                glyph = "□"
+            else:
+                glyph = "◻"
+
+        self.shadow_status_label.setText(f"Shadow Status: {status} {glyph}")
+        self.kill_switch_label.setText(f"Kill Switch: {kill_state} ■")
+        self.auto_kill_label.setText(f"Auto-Kill: {auto_kill_state}")
+        self.stealth_label.setText(f"Stealth Mode: {stealth_state}")
+        self.stealth_tier_label.setText(f"Stealth Tier: {stealth_tier}")
+
+        shadow_summary = {
+            "active": snapshot["active"],
+            "kill_switch": snapshot["kill_switch"],
+            "auto_kill": snapshot["auto_kill"],
+            "stealth_mode": snapshot["stealth_mode"],
+            "stealth_tier": snapshot["stealth_tier"],
+        }
+        self.shadow_summary.setPlainText(json.dumps(shadow_summary, indent=2))
+
+        persona = self.persona_engine.get_persona("GUI")
+        persona_summary = {
+            "id": persona.id,
+            "fingerprint": persona.device_fingerprint,
+            "activity": persona.activity_profile,
+            "sync_state": persona.sync_state,
+            "risk": persona.risk_level,
+            "region": persona.metadata.get("region"),
+            "role": persona.metadata.get("role"),
+            "stage": persona.metadata.get("evolution_stage"),
+            "recent_memory": [
+                {"event_type": m.event_type, "details": m.details}
+                for m in persona.memory[-3:]
+            ],
+        }
+        self.persona_summary.setPlainText(json.dumps(persona_summary, indent=2))
+
+        lock_state = "ACTIVE" if self.persona_engine.get_lock_state() else "INACTIVE"
+        self.persona_lock_label.setText(f"Persona Lock: {lock_state}")
+
+        swarm_state = "ACTIVE" if self.persona_engine.get_swarm_state() else "INACTIVE"
+        self.swarm_label.setText(f"Persona Swarm: {swarm_state}")
+        self.swarm_summary.setPlainText(json.dumps(self.persona_engine.get_swarm_summary(), indent=2))
+
+        flood_state = "ACTIVE" if self.telemetry_engine.flooder_enabled else "INACTIVE"
+        self.flooder_label.setText(f"Identity Flooder v2: {flood_state}")
+
+        logger_mode = "Low-Noise" if logger.low_noise_mode else "Normal"
+        self.logger_mode_label.setText(f"Logger Mode: {logger_mode}")
+
+        mode = "Lite (Freeze-Proof)" if self.lite_mode else "Heavy (Verbose)"
+        self.lite_mode_label.setText(f"GUI Mode: {mode}")
+
+        self._refresh_log()
+        self._refresh_patterns()
+        self._refresh_quarantine()
+        self._refresh_threat_scores()
+        self._refresh_reputation()
+
+    def _refresh_log(self):
+        limit = 40 if self.lite_mode else 120
+        recent = logger.get_recent(limit=limit)
+        self.telemetry_log.setPlainText("\n".join(recent))
+
+    def _refresh_patterns(self):
+        snapshot = self.pattern_detector.get_snapshot()
+        self.pattern_view.setPlainText(json.dumps(snapshot, indent=2))
+
+    def _refresh_quarantine(self):
+        snapshot = self.quarantine.get_snapshot()
+        self.quarantine_view.setPlainText(json.dumps(snapshot, indent=2))
+
+    def _refresh_threat_scores(self):
+        snapshot = self.threat_scores.get_snapshot()
+        self.threat_view.setPlainText(json.dumps(snapshot, indent=2))
+
+    def _refresh_reputation(self):
+        snapshot = self.reputation_engine.get_snapshot()
+        self.reputation_view.setPlainText(json.dumps(snapshot, indent=2))
+
+
+# ============================================================
+# Main
+# ============================================================
+
+logger = SafeLogger()
+
+
+def main():
+    state_store = JsonStateStore("codex_state.json", logger)
+    boot_info = compute_boot_info(state_store, logger)
+
+    forge = PersonaForge()
+    persona_engine = PersonaEngine(state_store, logger, forge)
+    identity_shadow = IdentityShadowLayer(state_store, logger)
+
+    persona_engine.apply_boot_policies(boot_info)
+    identity_shadow.apply_boot_policies(boot_info)
+
+    pattern_detector = PatternDetector(state_store, logger)
+    quarantine = SubsystemQuarantine(state_store, logger)
+    mirage = TelemetryMirage(logger)
+    honeypot = HoneypotSandbox(logger)
+    threat_scores = ThreatScoreStore(state_store, logger)
+    reputation_engine = ReputationEngine(state_store, logger)
+
+    telemetry_engine = FakeTelemetryEngine(
+        persona_engine, identity_shadow, logger, pattern_detector, quarantine, mirage, honeypot
+    )
+
+    threat_controller = ThreatAdaptiveController(
+        logger,
+        identity_shadow,
+        persona_engine,
+        telemetry_engine,
+        pattern_detector,
+        quarantine,
+        threat_scores,
+        reputation_engine,
+    )
+    telemetry_engine.attach_threat_controller(threat_controller)
+
+    self_healing = SelfHealingEngine(
+        logger,
+        state_store,
+        identity_shadow,
+        persona_engine,
+        pattern_detector,
+        quarantine,
+        threat_scores,
+        reputation_engine,
+    )
+
+    telemetry_engine.start()
+
+    if QtWidgets is None:
+        logger.log("PyQt5 not available; running headless.")
+        for name in ["EdgeSync", "MicrosoftStore", "Telemetry", "CloudSync"]:
+            telemetry_engine.submit_identity_access(name)
+            time.sleep(1.0)
+        telemetry_engine.stop()
+        self_healing.stop()
+        return
+
+    app = QtWidgets.QApplication([])
+    gui = CodexQtGUI(
+        logger,
+        identity_shadow,
+        persona_engine,
+        telemetry_engine,
+        pattern_detector,
+        quarantine,
+        threat_scores,
+        reputation_engine,
+    )
+
+    def on_close():
+        telemetry_engine.stop()
+        self_healing.stop()
+        gui.close()
+
+    gui.closeEvent = lambda event: (on_close(), event.accept())
+    gui.show()
+    app.exec_()
+
+
+if __name__ == "__main__":
+    main()
