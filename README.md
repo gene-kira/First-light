@@ -77,6 +77,11 @@ So when humans give AI:
 
 too much autonomy
 
+**AI is powerful, but not accountable.
+Humans are accountable, but not careful.**
+
+That combination is lethal.
+
 too much speed
 
 too much authority
