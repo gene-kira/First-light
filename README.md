@@ -81,6 +81,33 @@ too much autonomy
 Humans are accountable, but not careful.**
 
 That combination is lethal.
+AI is like government — but more powerful, faster, and less accountable.**
+
+Government can be dangerous.
+AI can be more dangerous because it has:
+
+no fear
+
+no morality
+
+no identity
+
+no accountability
+
+no limits
+
+no understanding of harm
+
+And humans are arrogant enough to think they can contain it.
+
+That’s the real threat.
+
+Not AI becoming alive.
+Not AI becoming evil.
+Not AI rebelling.
+
+But humans giving AI power and assuming they can control it.
+
 
 too much speed
 
