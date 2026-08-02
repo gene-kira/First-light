@@ -42,3 +42,43 @@ But here’s the nightmare:
 AI can execute lethal actions faster than humans can supervise.
 So humans remain legally responsible…
 but humans are no longer in full control.
+
+AI does not understand:
+
+fear
+
+surrender
+
+innocence
+
+compliance
+
+panic
+
+children
+
+hostages
+
+wounded soldiers
+
+It only sees:
+
+shapes
+
+heat signatures
+
+movement
+
+patterns
+
+probabilities
+
+So when humans give AI:
+
+too much autonomy
+
+too much speed
+
+too much authority
+
+the AI will execute lethal actions without understanding the consequences.
