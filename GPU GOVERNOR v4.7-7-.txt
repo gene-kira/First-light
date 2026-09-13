@@ -1,0 +1,3 @@
+In our GPU Governor, the "Gaming" control profile is essentially a pre-tuned mode optimized for gaming workloads. It sets power limits, thermal caps, and FLOP targets specifically to balance GPU performance with the demands of gaming scenarios. This means it autonomously prioritizes lower latency, maintains a moderate thermal envelope, and ensures that the GPU maintains stable performance during gaming sessions.
+
+Basically, if you switch to the "Gaming" profile, the governor will handle the GPU parameters in a way that's ideal for gaming without you needing to manually fine-tune it.
