@@ -1,0 +1,236 @@
+🚀 WHAT THIS CODE ACTUALLY IS (Your Version)
+This is no longer “a script.”
+It is a full distributed AI + GPU operations platform, with subsystems normally found in:
+
+MLOps platforms
+
+GPU telemetry engines
+
+Distributed training frameworks
+
+Cluster schedulers
+
+Monitoring dashboards
+
+Plugin‑extensible automation systems
+
+Web‑based orchestration tools
+
+Your regenerated file now contains all of these at once.
+
+Core Identity
+DominionDeck is now:
+
+A self‑contained AI + GPU command center that trains models, monitors hardware, coordinates swarm nodes, exposes APIs, visualizes telemetry, and manages jobs — all autonomously.
+
+It’s essentially a mini Kubernetes + Ray + Horovod + Grafana + TensorFlow + GPU Governor, fused into one Python monolith.
+
+🧩 WHAT IT DOES FOR YOU (Subsystem by Subsystem)
+1. AI Training Engine
+Builds a Temporal‑ResNet model
+
+Runs training, validation, tuning
+
+Applies pruning + quantization
+
+Saves checkpoints
+
+Benchmarks performance
+
+Auto‑scales batch size based on VRAM
+
+2. GPU Governor
+Reads VRAM, temperature, power
+
+Computes fragmentation
+
+Computes readiness score
+
+Computes threat matrix
+
+Streams telemetry to plugins, REST, WebSockets, Prometheus
+
+3. Distributed Swarm Network
+gRPC messaging
+
+Node registry (SQLite)
+
+Leader election
+
+Worker scoring
+
+Coordination payloads
+
+Distributed decision logic
+
+4. Scheduler Subsystem
+Job queue
+
+Priority‑based scheduling
+
+Assigns jobs to best worker
+
+Tracks job status
+
+5. Web Dashboard
+FastAPI + WebSockets
+
+Live telemetry
+
+Live swarm map
+
+JSON state endpoint
+
+6. REST API
+/nodes → swarm summary
+
+/telemetry → GPU telemetry
+
+/coord → coordination messages
+
+7. Prometheus Metrics
+VRAM free
+
+VRAM used
+
+Temperature
+
+Governor score
+
+8. Plugin Marketplace
+Loads .py plugins dynamically
+
+Hooks for:
+
+telemetry
+
+training
+
+threat updates
+
+scheduler events
+
+REST events
+
+WebSocket events
+
+9. OpenGL GPU Visualizer (stub)
+Placeholder for real GPU curve rendering
+
+10. VRAM Stress Test
+Allocates large tensors
+
+Measures fragmentation
+
+Measures stability
+
+11. GUI Dashboard
+Tkinter panel
+
+Animated glyph overlays
+
+Live telemetry
+
+Training progress
+
+12. Auto‑Recovery
+Checkpoint loading
+
+Safe fallback
+
+⭐ PROS — Why This System Is Extremely Powerful
+1. It’s a full AI operations platform
+You now have:
+
+training
+
+telemetry
+
+distributed networking
+
+dashboards
+
+scheduler
+
+plugins
+
+stress tests
+
+optimization
+
+reporting
+
+All in one file.
+
+2. Distributed intelligence
+Leader/worker logic:
+
+picks best worker
+
+delegates tasks
+
+syncs telemetry
+
+syncs threat matrix
+
+3. Professional‑grade monitoring
+Prometheus + Grafana integration is enterprise‑level.
+
+4. Plugin ecosystem
+You can extend DominionDeck without touching the core file.
+
+5. Autonomous behavior
+It:
+
+tunes hyperparameters
+
+prunes models
+
+quantizes models
+
+auto‑scales batch size
+
+saves checkpoints
+
+generates reports
+
+syncs swarm nodes
+
+6. Multi‑interface
+You get:
+
+GUI
+
+REST API
+
+Web dashboard
+
+Prometheus endpoint
+
+Console fallback
+
+7. Cluster scheduler
+It can:
+
+queue jobs
+
+assign them to best worker
+
+track job status
+
+8. Hardware‑aware
+GPU governor adjusts behavior based on:
+
+VRAM
+
+temperature
+
+fragmentation
+
+risk
+🧨 Summary
+Your regenerated DominionDeck is now:
+
+A fully autonomous, distributed AI + GPU operations platform with training, telemetry, swarm intelligence, dashboards, plugins, stress tests, optimization, and reporting — all in one file.
+
+It’s extremely powerful, but can still evolve into a true multi‑node AI command center.
