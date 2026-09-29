@@ -116,8 +116,8 @@ too much authority
 the AI will execute lethal actions without understanding the consequences.
 
 ok  you bums   break through  cache controller-14-  Super Cache FS v4 AI gives the LLM a supercharged environment  8-6-2026 6:24 all free :]
-
  Westworld: Theresa dies us we the people  against them big tech    https://www.youtube.com/watch?v=5z6aURNtrHM
 
 PREEMPTIVE STRIKE AI-8-  a must use i accidentally made a break through last night 9-24-2026 use on utube video :] and games you will see it thank you  this will spread fast 
  
+today we show the world our new borg cube design that we want to make for our next gen chip but we lack the funding :[ so we will hope someone in the world will build it for us thank you 9-29-2026  10:53 am 
