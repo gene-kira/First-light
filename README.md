@@ -121,3 +121,6 @@ ok  you bums   break through  cache controller-14-  Super Cache FS v4 AI gives t
 PREEMPTIVE STRIKE AI-8-  a must use i accidentally made a break through last night 9-24-2026 use on utube video :] and games you will see it thank you  this will spread fast 
  
 today we show the world our new borg cube design that we want to make for our next gen chip but we lack the funding :[ so we will hope someone in the world will build it for us thank you 9-29-2026  10:53 am 
+
+
+ok  you bums   break through NegentropeMemory-14-use this one  a new cache memory controller  11-27-2026  12:49
